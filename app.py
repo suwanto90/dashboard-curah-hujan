@@ -10,11 +10,11 @@ st.set_page_config(
 )
 
 st.title("🌧️ Dashboard Pencarian Data Curah Hujan")
-st.write("Pencarian berdasarkan Estate, Divisi, dan Document Date")
+st.write("Pencarian berdasarkan multi Estate, multi Divisi, dan rentang Document Date")
+
 
 @st.cache_data
 def load_data():
-    # Header berada di baris kedua Excel (index 1)
     df = pd.read_excel(
         "DATA CURAH HUJAN APRIL-JUNI 2026.XLS(1).xlsx",
         header=1
@@ -22,71 +22,86 @@ def load_data():
 
     df.columns = [str(c).strip() for c in df.columns]
 
-    # Konversi tanggal
-    if "Document Date" in df.columns:
-        df["Document Date"] = pd.to_datetime(
-            df["Document Date"],
-            errors="coerce"
-        )
+    df["Document Date"] = pd.to_datetime(
+        df["Document Date"],
+        errors="coerce"
+    )
 
     return df
 
 
 df = load_data()
 
-# Menu pencarian
-st.subheader("🔎 Pencarian Data")
 
-col1, col2, col3 = st.columns(3)
+st.subheader("🔎 Menu Pencarian")
+
+col1, col2 = st.columns(2)
 
 with col1:
-    estate_list = ["Semua"] + sorted(
+    estate_list = sorted(
         df["Estate"].dropna().astype(str).unique()
     )
-    estate = st.selectbox(
-        "🏡 Estate",
+
+    estate = st.multiselect(
+        "🏡 Pilih Estate (bisa lebih dari satu)",
         estate_list
     )
 
+
 with col2:
-    divisi_list = ["Semua"] + sorted(
+    divisi_list = sorted(
         df["Divisi"].dropna().astype(str).unique()
     )
-    divisi = st.selectbox(
-        "🏢 Divisi",
+
+    divisi = st.multiselect(
+        "🏢 Pilih Divisi (bisa lebih dari satu)",
         divisi_list
     )
 
+
+col3, col4 = st.columns(2)
+
 with col3:
-    tanggal = st.date_input(
-        "📅 Document Date"
+    tanggal_awal = st.date_input(
+        "📅 Document Date Mulai",
+        value=df["Document Date"].min().date()
+    )
+
+with col4:
+    tanggal_akhir = st.date_input(
+        "📅 Document Date Sampai",
+        value=df["Document Date"].max().date()
     )
 
 
-# Filter data
+# FILTER DATA
 hasil = df.copy()
 
-if estate != "Semua":
+
+if estate:
     hasil = hasil[
-        hasil["Estate"].astype(str) == estate
+        hasil["Estate"].astype(str).isin(estate)
     ]
 
-if divisi != "Semua":
+
+if divisi:
     hasil = hasil[
-        hasil["Divisi"].astype(str) == divisi
+        hasil["Divisi"].astype(str).isin(divisi)
     ]
 
-if tanggal:
-    hasil = hasil[
-        hasil["Document Date"].dt.date == tanggal
-    ]
+
+hasil = hasil[
+    (hasil["Document Date"].dt.date >= tanggal_awal) &
+    (hasil["Document Date"].dt.date <= tanggal_akhir)
+]
 
 
 st.divider()
 
 st.subheader("📋 Hasil Pencarian")
 
-kolom_tampil = [
+
+kolom = [
     "Document Date",
     "Estate",
     "Divisi",
@@ -94,9 +109,9 @@ kolom_tampil = [
     "UM"
 ]
 
+
 kolom_tersedia = [
-    c for c in kolom_tampil
-    if c in hasil.columns
+    x for x in kolom if x in hasil.columns
 ]
 
 
@@ -107,6 +122,7 @@ if len(hasil) > 0:
         use_container_width=True
     )
 
+
     a,b,c = st.columns(3)
 
     a.metric(
@@ -114,62 +130,63 @@ if len(hasil) > 0:
         len(hasil)
     )
 
-    if "quantity" in hasil.columns:
-        total = pd.to_numeric(
-            hasil["quantity"],
-            errors="coerce"
-        ).sum()
 
-        b.metric(
-            "Total Curah Hujan",
-            f"{total:,.0f}"
-        )
+    total = pd.to_numeric(
+        hasil["quantity"],
+        errors="coerce"
+    ).sum()
 
-    if "UM" in hasil.columns:
-        c.metric(
-            "Satuan",
-            str(hasil["UM"].iloc[0])
-        )
+    b.metric(
+        "Total Curah Hujan",
+        f"{total:,.0f}"
+    )
+
+
+    c.metric(
+        "Periode",
+        f"{tanggal_awal} s/d {tanggal_akhir}"
+    )
 
 
     st.subheader("📊 Grafik Curah Hujan")
 
-    if "Divisi" in hasil.columns and "quantity" in hasil.columns:
 
-        grafik = px.bar(
-            hasil,
-            x="Divisi",
-            y="quantity",
-            title="Curah Hujan Berdasarkan Divisi"
-        )
+    grafik1 = px.bar(
+        hasil,
+        x="Estate",
+        y="quantity",
+        color="Divisi",
+        title="Curah Hujan per Estate dan Divisi"
+    )
 
-        st.plotly_chart(
-            grafik,
-            use_container_width=True
-        )
+    st.plotly_chart(
+        grafik1,
+        use_container_width=True
+    )
 
 
-    if "Document Date" in hasil.columns and "quantity" in hasil.columns:
+    grafik2 = px.line(
+        hasil.sort_values("Document Date"),
+        x="Document Date",
+        y="quantity",
+        color="Estate",
+        markers=True,
+        title="Trend Curah Hujan"
+    )
 
-        trend = px.line(
-            hasil.sort_values("Document Date"),
-            x="Document Date",
-            y="quantity",
-            markers=True,
-            title="Trend Curah Hujan"
-        )
+    st.plotly_chart(
+        grafik2,
+        use_container_width=True
+    )
 
-        st.plotly_chart(
-            trend,
-            use_container_width=True
-        )
 
 else:
+
     st.warning(
-        "Data tidak ditemukan. Silakan ubah filter."
+        "Data tidak ditemukan. Silakan ubah filter pencarian."
     )
 
 
 st.sidebar.info(
-    "Dashboard menggunakan database Excel Curah Hujan April-Juni 2026."
+    "Dashboard Curah Hujan - Database Excel April-Juni 2026"
 )
