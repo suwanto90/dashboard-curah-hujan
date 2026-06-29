@@ -9,20 +9,15 @@ st.set_page_config(
     layout="wide"
 )
 
-# Background elegan
+# Background dashboard
 st.markdown("""
 <style>
 .stApp {
     background-image:
-    linear-gradient(rgba(255,255,255,0.90), rgba(255,255,255,0.90)),
-    url("https://images.unsplash.com/photo-1501691223387-dd0500403074");
+    linear-gradient(rgba(255,255,255,0.88), rgba(255,255,255,0.88)),
+    url("https://images.unsplash.com/photo-1437622368342-7a3d73a34c8f");
     background-size: cover;
     background-attachment: fixed;
-}
-[data-testid="stMetric"] {
-    background-color: rgba(255,255,255,0.75);
-    padding: 15px;
-    border-radius: 15px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -58,35 +53,38 @@ def load_data():
 df = load_data()
 
 
-# FILTER
-st.subheader("🔎 Pencarian Data")
+# =====================
+# FILTER PENCARIAN
+# =====================
 
-a,b = st.columns(2)
+st.subheader("🔎 Menu Pencarian")
 
-with a:
+c1, c2 = st.columns(2)
+
+with c1:
     estate = st.multiselect(
         "🏡 Estate",
         sorted(df["Estate"].dropna().astype(str).unique())
     )
 
-with b:
+with c2:
     divisi = st.multiselect(
         "🏢 Divisi",
         sorted(df["Divisi"].dropna().astype(str).unique())
     )
 
 
-c,d = st.columns(2)
+c3, c4 = st.columns(2)
 
-with c:
+with c3:
     start = st.date_input(
-        "Tanggal Mulai",
+        "📅 Mulai",
         df["Document Date"].min().date()
     )
 
-with d:
+with c4:
     end = st.date_input(
-        "Tanggal Akhir",
+        "📅 Sampai",
         df["Document Date"].max().date()
     )
 
@@ -94,10 +92,14 @@ with d:
 hasil = df.copy()
 
 if estate:
-    hasil = hasil[hasil["Estate"].astype(str).isin(estate)]
+    hasil = hasil[
+        hasil["Estate"].astype(str).isin(estate)
+    ]
 
 if divisi:
-    hasil = hasil[hasil["Divisi"].astype(str).isin(divisi)]
+    hasil = hasil[
+        hasil["Divisi"].astype(str).isin(divisi)
+    ]
 
 
 hasil = hasil[
@@ -106,7 +108,10 @@ hasil = hasil[
 ]
 
 
-# HASIL DATA
+# =====================
+# HASIL PENCARIAN
+# =====================
+
 st.subheader("📋 Informasi Lengkap Hasil Pencarian")
 
 st.dataframe(
@@ -125,41 +130,71 @@ st.dataframe(
 
 st.divider()
 
-
-# GRAFIK
-
 st.header("📊 Analisis Curah Hujan")
 
 
-# 1 Harian
-st.subheader("1. Curah Hujan Harian per Estate (Tanggal 1 - 31)")
+# =====================
+# 1. WEEKLY W1-W4
+# =====================
 
-daily = hasil.copy()
-daily["Tanggal"] = daily["Document Date"].dt.day
+st.subheader("1. Curah Hujan Mingguan per Estate (W1-W4)")
 
-daily = daily.groupby(
-    ["Tanggal","Estate"],
+weekly = hasil.copy()
+
+weekly["Bulan"] = weekly["Document Date"].dt.month_name()
+
+weekly["Minggu"] = (
+    ((weekly["Document Date"].dt.day - 1) // 7) + 1
+)
+
+weekly["Minggu"] = "W" + weekly["Minggu"].astype(str)
+
+weekly = weekly.groupby(
+    ["Bulan","Minggu","Estate"],
     as_index=False
 )["quantity"].sum()
 
 
+bulan_order = ["April","May","June"]
+minggu_order = ["W1","W2","W3","W4"]
+
+weekly["Bulan"] = pd.Categorical(
+    weekly["Bulan"],
+    categories=bulan_order,
+    ordered=True
+)
+
+weekly["Minggu"] = pd.Categorical(
+    weekly["Minggu"],
+    categories=minggu_order,
+    ordered=True
+)
+
+
 st.plotly_chart(
-    px.line(
-        daily,
-        x="Tanggal",
+    px.bar(
+        weekly,
+        x="Minggu",
         y="quantity",
         color="Estate",
-        markers=True
+        facet_col="Bulan",
+        category_orders={
+            "Bulan": bulan_order,
+            "Minggu": minggu_order
+        }
     ),
     use_container_width=True
 )
 
 
-# 2 Bulanan
-st.subheader("2. Curah Hujan Bulanan per Estate (April - Juni)")
+# =====================
+# 2. BULANAN
+# =====================
 
+st.subheader("2. Curah Hujan Bulanan per Estate")
 
 monthly = hasil.copy()
+
 monthly["Bulan"] = monthly["Document Date"].dt.month_name()
 
 monthly = monthly.groupby(
@@ -167,12 +202,9 @@ monthly = monthly.groupby(
     as_index=False
 )["quantity"].sum()
 
-
-order = ["April","May","June"]
-
 monthly["Bulan"] = pd.Categorical(
     monthly["Bulan"],
-    categories=order,
+    categories=bulan_order,
     ordered=True
 )
 
@@ -183,37 +215,46 @@ st.plotly_chart(
         x="Bulan",
         y="quantity",
         color="Estate",
-        barmode="group"
+        barmode="group",
+        category_orders={
+            "Bulan": bulan_order
+        }
     ),
     use_container_width=True
 )
 
 
-# 3 Trend
-st.subheader("3. Trend Curah Hujan per Estate")
+# =====================
+# 3 TREND BAR
+# =====================
+
+st.subheader("3. Trend Curah Hujan Estate per Bulan")
 
 st.plotly_chart(
-    px.line(
+    px.bar(
         monthly,
         x="Bulan",
         y="quantity",
         color="Estate",
-        markers=True
+        category_orders={
+            "Bulan": bulan_order
+        }
     ),
     use_container_width=True
 )
 
 
-# 4 Pie
-st.subheader("4. Hari Hujan vs Tidak Hujan per Estate")
+# =====================
+# 4 PIE
+# =====================
 
+st.subheader("4. Hari Hujan vs Tidak Hujan per Estate")
 
 pie = hasil.copy()
 
 pie["Status Hari"] = pie["quantity"].apply(
     lambda x: "Hari Hujan" if x > 0 else "Tidak Hujan"
 )
-
 
 pie = pie.groupby(
     ["Estate","Status Hari"]
@@ -231,23 +272,26 @@ st.plotly_chart(
 )
 
 
-# 5 Ranking
+# =====================
+# 5 RANKING
+# =====================
+
 st.subheader("5. Ranking 3 Besar Curah Hujan Estate")
 
+ranking = (
+    monthly.groupby("Estate", as_index=False)
+    ["quantity"].sum()
+    .sort_values(
+        "quantity",
+        ascending=False
+    )
+    .head(3)
+)
 
-ranking = monthly.groupby(
-    "Estate",
-    as_index=False
-)["quantity"].sum()
-
-
-ranking = ranking.sort_values(
-    "quantity",
-    ascending=False
-).head(3)
-
-
-st.dataframe(ranking)
+st.dataframe(
+    ranking,
+    use_container_width=True
+)
 
 
 st.plotly_chart(
@@ -260,26 +304,32 @@ st.plotly_chart(
 )
 
 
-# 6 Status
+# =====================
+# 6 STATUS
+# =====================
+
 st.subheader("6. Status Kondisi Estate per Bulan")
 
 
-def status(x):
+def kondisi(x):
+
     if x < 100:
         return "Kering"
+
     elif x <= 300:
         return "Normal"
+
     else:
         return "Tinggi"
 
 
-kondisi = monthly.copy()
+status = monthly.copy()
 
-kondisi["Status"] = kondisi["quantity"].apply(status)
+status["Status"] = status["quantity"].apply(kondisi)
 
 
 st.dataframe(
-    kondisi[
+    status[
         [
             "Bulan",
             "Estate",
