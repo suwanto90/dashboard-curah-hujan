@@ -3,86 +3,173 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(page_title="Dashboard Curah Hujan", page_icon="🌧️", layout="wide")
+st.set_page_config(
+    page_title="Dashboard Curah Hujan",
+    page_icon="🌧️",
+    layout="wide"
+)
+
+st.title("🌧️ Dashboard Pencarian Data Curah Hujan")
+st.write("Pencarian berdasarkan Estate, Divisi, dan Document Date")
 
 @st.cache_data
 def load_data():
-    df = pd.read_excel("DATA CURAH HUJAN APRIL-JUNI 2026.XLS(1).xlsx", header=1)
+    # Header berada di baris kedua Excel (index 1)
+    df = pd.read_excel(
+        "DATA CURAH HUJAN APRIL-JUNI 2026.XLS(1).xlsx",
+        header=1
+    )
+
     df.columns = [str(c).strip() for c in df.columns]
+
+    # Konversi tanggal
+    if "Document Date" in df.columns:
+        df["Document Date"] = pd.to_datetime(
+            df["Document Date"],
+            errors="coerce"
+        )
+
     return df
+
 
 df = load_data()
 
-st.title("🌧️ Dashboard Pencarian Data Curah Hujan")
-st.caption("Pencarian berdasarkan Estate, Divisi, dan Document Date")
+# Menu pencarian
+st.subheader("🔎 Pencarian Data")
 
-# Normalize date
-if "Document Date" in df.columns:
-    df["Document Date"] = pd.to_datetime(df["Document Date"], errors="coerce")
+col1, col2, col3 = st.columns(3)
 
-# Search menu
-c1, c2, c3 = st.columns(3)
+with col1:
+    estate_list = ["Semua"] + sorted(
+        df["Estate"].dropna().astype(str).unique()
+    )
+    estate = st.selectbox(
+        "🏡 Estate",
+        estate_list
+    )
 
-with c1:
-    estate = st.selectbox("🏡 Estate", ["Semua"] + sorted(df["Estate"].dropna().astype(str).unique()))
+with col2:
+    divisi_list = ["Semua"] + sorted(
+        df["Divisi"].dropna().astype(str).unique()
+    )
+    divisi = st.selectbox(
+        "🏢 Divisi",
+        divisi_list
+    )
 
-with c2:
-    divisi_col = "Divisi" if "Divisi" in df.columns else None
-    divisi = st.selectbox("🏢 Divisi", ["Semua"] + sorted(df[divisi_col].dropna().astype(str).unique())) if divisi_col else "Semua"
+with col3:
+    tanggal = st.date_input(
+        "📅 Document Date"
+    )
 
-with c3:
-    tanggal = st.date_input("📅 Document Date")
 
-result = df.copy()
+# Filter data
+hasil = df.copy()
 
 if estate != "Semua":
-    result = result[result["Estate"].astype(str) == estate]
+    hasil = hasil[
+        hasil["Estate"].astype(str) == estate
+    ]
 
-if divisi_col and divisi != "Semua":
-    result = result[result["Divisi"].astype(str) == divisi]
+if divisi != "Semua":
+    hasil = hasil[
+        hasil["Divisi"].astype(str) == divisi
+    ]
 
 if tanggal:
-    result = result[result["Document Date"].dt.date == tanggal]
+    hasil = hasil[
+        hasil["Document Date"].dt.date == tanggal
+    ]
+
 
 st.divider()
 
-# Result
 st.subheader("📋 Hasil Pencarian")
 
-show_cols = [c for c in ["Document Date","Estate","Divisi","Quantity","UM"] if c in result.columns]
+kolom_tampil = [
+    "Document Date",
+    "Estate",
+    "Divisi",
+    "quantity",
+    "UM"
+]
 
-if len(result):
-    st.dataframe(result[show_cols], use_container_width=True)
+kolom_tersedia = [
+    c for c in kolom_tampil
+    if c in hasil.columns
+]
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Jumlah Data", len(result))
-    if "Quantity" in result.columns:
-        col2.metric("Total Curah Hujan", f'{pd.to_numeric(result["Quantity"], errors="coerce").sum():,.0f}')
-    col3.metric("Satuan", result["UM"].iloc[0] if "UM" in result.columns else "-")
+
+if len(hasil) > 0:
+
+    st.dataframe(
+        hasil[kolom_tersedia],
+        use_container_width=True
+    )
+
+    a,b,c = st.columns(3)
+
+    a.metric(
+        "Jumlah Data",
+        len(hasil)
+    )
+
+    if "quantity" in hasil.columns:
+        total = pd.to_numeric(
+            hasil["quantity"],
+            errors="coerce"
+        ).sum()
+
+        b.metric(
+            "Total Curah Hujan",
+            f"{total:,.0f}"
+        )
+
+    if "UM" in hasil.columns:
+        c.metric(
+            "Satuan",
+            str(hasil["UM"].iloc[0])
+        )
+
 
     st.subheader("📊 Grafik Curah Hujan")
 
-    if "Estate" in result.columns and "Quantity" in result.columns:
-        chart = px.bar(
-            result,
-            x="Estate",
-            y="Quantity",
-            title="Curah Hujan per Estate"
-        )
-        st.plotly_chart(chart, use_container_width=True)
+    if "Divisi" in hasil.columns and "quantity" in hasil.columns:
 
-    if "Document Date" in result.columns and "Quantity" in result.columns:
+        grafik = px.bar(
+            hasil,
+            x="Divisi",
+            y="quantity",
+            title="Curah Hujan Berdasarkan Divisi"
+        )
+
+        st.plotly_chart(
+            grafik,
+            use_container_width=True
+        )
+
+
+    if "Document Date" in hasil.columns and "quantity" in hasil.columns:
+
         trend = px.line(
-            result.sort_values("Document Date"),
+            hasil.sort_values("Document Date"),
             x="Document Date",
-            y="Quantity",
+            y="quantity",
             markers=True,
             title="Trend Curah Hujan"
         )
-        st.plotly_chart(trend, use_container_width=True)
+
+        st.plotly_chart(
+            trend,
+            use_container_width=True
+        )
 
 else:
-    st.warning("Data tidak ditemukan. Silakan ubah filter pencarian.")
+    st.warning(
+        "Data tidak ditemukan. Silakan ubah filter."
+    )
 
-st.sidebar.header("🌱 Informasi")
-st.sidebar.write("Dashboard menggunakan database Excel curah hujan April-Juni 2026.")
+
+st.sidebar.info(
+    "Dashboard menggunakan database Excel Curah Hujan April-Juni 2026."
+)
