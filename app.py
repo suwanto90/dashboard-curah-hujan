@@ -61,20 +61,20 @@ bulan=["April","May","June"]
 st.subheader("1. Rata-rata Curah Hujan Harian per Estate per Minggu")
 weekly=data.groupby(["Bulan","Minggu","Estate"],as_index=False)["quantity"].mean().round(0)
 st.plotly_chart(px.line(weekly,x="Minggu",y="quantity",color="Estate",facet_col="Bulan",markers=True),use_container_width=True)
-
+key="grafik_mingguan"
 st.subheader("2. Rata-rata Curah Hujan Bulanan per Estate")
 monthly=data.groupby(["Bulan","Estate"],as_index=False)["quantity"].mean().round(0)
 st.plotly_chart(px.line(monthly,x="Bulan",y="quantity",color="Estate",markers=True,category_orders={"Bulan":bulan}),use_container_width=True)
-
+key="grafik_bulanan"
 st.subheader("3. Trend Rata-rata Curah Hujan Estate per Bulan")
 st.plotly_chart(px.bar(monthly,x="Bulan",y="quantity",color="Estate",category_orders={"Bulan":bulan}),use_container_width=True)
-
+key="grafik_trend"
 st.subheader("4. Hari Hujan vs Tidak Hujan")
 pie=data.copy()
 pie["Status Hari"]=pie["quantity"].apply(lambda x:"Hari Hujan" if x>0 else "Tidak Hujan")
 pie=pie.groupby(["Estate","Status Hari"]).size().reset_index(name="Jumlah Hari")
 st.plotly_chart(px.pie(pie,names="Status Hari",values="Jumlah Hari",facet_col="Estate"),use_container_width=True)
-
+key="grafik_pie"
 st.subheader("5. Ranking 3 Besar Curah Hujan Estate")
 rank=monthly.groupby("Estate",as_index=False)["quantity"].sum().round(0).sort_values("quantity",ascending=False).head(3)
 st.dataframe(rank)
