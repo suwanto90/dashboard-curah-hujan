@@ -6,7 +6,7 @@ import plotly.express as px
 import streamlit as st
 
 st.set_page_config(
-    page_title="Dashboard Curah Hujan Kelapa Sawit",
+    page_title="Dashboard Curah Hujan KMP1 KARYAMAS PLANTATION",
     page_icon="🌴",
     layout="wide",
     initial_sidebar_state="expanded",
